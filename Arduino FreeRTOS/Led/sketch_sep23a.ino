@@ -9,8 +9,8 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
     digitalWrite(led_pin, HIGH); //turn the led on
-    delay(10000);
+    delay(100);
 
     digitalWrite(led_pin, LOW); //turn the led off
-    delay(10000);
+    delay(100);
 }
