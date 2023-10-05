@@ -5,44 +5,42 @@
 #include <QDebug>
 #include <QtWidgets>
 
-
 Dialog::Dialog(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::Dialog)
 {
     ui->setupUi(this);
 
+    initializeArduino();
+    connectSignalsAndSlots();
+}
+
+Dialog::~Dialog()
+{
+    if (arduino->isOpen()) {
+        arduino->close();
+    }
+    delete ui;
+}
+
+void Dialog::initializeArduino()
+{
     arduino_is_available = false;
     arduino_port_name = "";
     arduino = new QSerialPort;
 
-    /*
-    qDebug() << "Number of available ports: " << QSerialPortInfo::availablePorts().length();
-    foreach(const QSerialPortInfo &serialPortInfo, QSerialPortInfo::availablePorts()){
-        qDebug() << "Has vendor ID: " << serialPortInfo.hasVendorIdentifier();
-        if(serialPortInfo.hasVendorIdentifier()){
-            qDebug() << "Vendor ID: " << serialPortInfo.vendorIdentifier();
-        }
-        qDebug() << "Has Product ID: " << serialPortInfo.hasProductIdentifier();
-        if(serialPortInfo.hasProductIdentifier()){
-            qDebug() << "Product ID: " << serialPortInfo.productIdentifier();
-        }
-    }
-    */
-
-    foreach(const QSerialPortInfo &serialPortInfo, QSerialPortInfo::availablePorts()){
-        if(serialPortInfo.hasVendorIdentifier() && serialPortInfo.hasProductIdentifier()){
-            if(serialPortInfo.vendorIdentifier() == arduino_uno_vendor_id){
-                if(serialPortInfo.productIdentifier() == arduino_uno_product_id){
-                    arduino_port_name = serialPortInfo.portName();
-                    arduino_is_available = true;
-                }
+    foreach(const QSerialPortInfo &serialPortInfo, QSerialPortInfo::availablePorts()) {
+        if (serialPortInfo.hasVendorIdentifier() && serialPortInfo.hasProductIdentifier()) {
+            if (serialPortInfo.vendorIdentifier() == arduino_uno_vendor_id &&
+                serialPortInfo.productIdentifier() == arduino_uno_product_id) {
+                arduino_port_name = serialPortInfo.portName();
+                arduino_is_available = true;
+                break;
             }
         }
     }
 
-    if(arduino_is_available){
-        // open and configure the serialport
+    if (arduino_is_available) {
         arduino->setPortName(arduino_port_name);
         arduino->open(QSerialPort::WriteOnly);
         arduino->setBaudRate(QSerialPort::Baud9600);
@@ -50,46 +48,45 @@ Dialog::Dialog(QWidget *parent) :
         arduino->setParity(QSerialPort::NoParity);
         arduino->setStopBits(QSerialPort::OneStop);
         arduino->setFlowControl(QSerialPort::NoFlowControl);
-    }else{
-        // give error message if not available
+    } else {
         QMessageBox::warning(this, "Port error", "Couldn't find the Arduino!");
     }
 }
 
-Dialog::~Dialog()
+void Dialog::connectSignalsAndSlots()
 {
-    if(arduino->isOpen()){
-        arduino->close();
+    connect(ui->red_slider, SIGNAL(valueChanged(int)), this, SLOT(onSliderValueChanged(int)));
+    connect(ui->green_slider, SIGNAL(valueChanged(int)), this, SLOT(onSliderValueChanged(int)));
+    connect(ui->blue_slider, SIGNAL(valueChanged(int)), this, SLOT(onSliderValueChanged(int)));
+}
+
+void Dialog::onSliderValueChanged(int value)
+{
+    QSlider* senderSlider = qobject_cast<QSlider*>(sender());
+    if (senderSlider) {
+        QString color;
+        if (senderSlider == ui->red_slider) {
+            color = "r";
+        } else if (senderSlider == ui->green_slider) {
+            color = "g";
+        } else if (senderSlider == ui->blue_slider) {
+            color = "b";
+        }
+
+        ui->red_value->setText(QString("<span style=\" font-size:18pt; font-weight:600;\">%1</span>").arg(ui->red_slider->value()));
+        ui->green_value->setText(QString("<span style=\" font-size:18pt; font-weight:600;\">%1</span>").arg(ui->green_slider->value()));
+        ui->blue_value->setText(QString("<span style=\" font-size:18pt; font-weight:600;\">%1</span>").arg(ui->blue_slider->value()));
+
+        updateRGB(color + QString::number(value));
+        qDebug() << value;
     }
-    delete ui;
 }
 
-void Dialog::on_red_slider_valueChanged(int value)
+void Dialog::updateRGB(const QString& command)
 {
-    ui->red_value->setText(QString("<span style=\" font-size:18pt; font-weight:600;\">%1</span>").arg(value));
-    Dialog::updateRGB(QString("r%1").arg(value));
-    qDebug() << value;
-}
-
-void Dialog::on_green_slider_valueChanged(int value)
-{
-    ui->green_value->setText(QString("<span style=\" font-size:18pt; font-weight:600;\">%1</span>").arg(value));
-    Dialog::updateRGB(QString("g%1").arg(value));
-    qDebug() << value;
-}
-
-void Dialog::on_blue_slider_valueChanged(int value)
-{
-    ui->blue_value->setText(QString("<span style=\" font-size:18pt; font-weight:600;\">%1</span>").arg(value));
-    Dialog::updateRGB(QString("b%1").arg(value));
-    qDebug() << value;
-}
-
-void Dialog::updateRGB(QString command)
-{
-    if(arduino->isWritable()){
+    if (arduino->isWritable()) {
         arduino->write(command.toStdString().c_str());
-    }else{
+    } else {
         qDebug() << "Couldn't write to serial!";
     }
 }
